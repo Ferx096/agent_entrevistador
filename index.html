@@ -415,6 +415,7 @@
         let recordingInterval = null;
         let recordingSeconds = 0;
         let currentPhase = 1;
+        let currentMimeType = 'audio/webm'; // Variable para guardar el mimeType actual
 
         // ═══════════════════════════════════════════════════════
         // FUNCIONES DE MENSAJES
@@ -542,7 +543,7 @@
         }
 
         // ═══════════════════════════════════════════════════════
-        // GRABACIÓN DE AUDIO
+        // GRABACIÓN DE AUDIO - CORREGIDO PARA WHISPER
         // ═══════════════════════════════════════════════════════
         
         async function startRecording() {
@@ -554,8 +555,24 @@
                     } 
                 });
 
+                // ═══════════════════════════════════════════════════════
+                // FIX: Seleccionar formato compatible con Whisper
+                // Orden de preferencia: mp4 > ogg > webm
+                // ═══════════════════════════════════════════════════════
+                if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    currentMimeType = 'audio/mp4';
+                } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+                    currentMimeType = 'audio/ogg;codecs=opus';
+                } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                    currentMimeType = 'audio/webm;codecs=opus';
+                } else {
+                    currentMimeType = 'audio/webm';
+                }
+
+                console.log('Formato de audio seleccionado:', currentMimeType);
+
                 mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'audio/webm;codecs=opus'
+                    mimeType: currentMimeType
                 });
 
                 audioChunks = [];
@@ -567,7 +584,8 @@
 
                 mediaRecorder.onstop = async () => {
                     stream.getTracks().forEach(track => track.stop());
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    // Usar el mimeType actual del mediaRecorder
+                    const audioBlob = new Blob(audioChunks, { type: currentMimeType });
                     await sendAudioMessage(audioBlob);
                 };
 
@@ -618,6 +636,20 @@
                 // Convertir a base64
                 const base64Audio = await blobToBase64(audioBlob);
 
+                // ═══════════════════════════════════════════════════════
+                // FIX: Detectar el formato correcto para enviar
+                // ═══════════════════════════════════════════════════════
+                let audioFormat = 'webm'; // default
+                if (currentMimeType.includes('mp4')) {
+                    audioFormat = 'mp4';
+                } else if (currentMimeType.includes('ogg')) {
+                    audioFormat = 'ogg';
+                } else if (currentMimeType.includes('webm')) {
+                    audioFormat = 'webm';
+                }
+
+                console.log('Enviando audio en formato:', audioFormat);
+
                 const response = await fetch(CONFIG.webhookUrl, {
                     method: 'POST',
                     headers: {
@@ -625,7 +657,7 @@
                     },
                     body: JSON.stringify({
                         audioBase64: base64Audio,
-                        audioFormat: 'webm',
+                        audioFormat: audioFormat,
                         sessionId: CONFIG.sessionId,
                         userName: CONFIG.userName,
                         source: 'web'
