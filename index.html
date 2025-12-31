@@ -297,6 +297,26 @@
             color: #c53030;
         }
 
+        /* Debug Panel - Solo para desarrollo */
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 11px;
+            max-width: 300px;
+            display: none; /* Cambiar a 'block' para debug */
+            z-index: 9999;
+        }
+
+        .debug-panel.visible {
+            display: block;
+        }
+
         /* Responsive */
         @media (max-width: 480px) {
             .chat-container {
@@ -313,6 +333,12 @@
 </head>
 <body>
     <div class="connection-status" id="connectionStatus"></div>
+    
+    <!-- Panel de Debug (oculto por defecto) -->
+    <div class="debug-panel" id="debugPanel">
+        <div><strong>🔧 Debug Audio</strong></div>
+        <div id="debugInfo">Esperando...</div>
+    </div>
 
     <div class="chat-container">
         <div class="chat-header">
@@ -381,7 +407,10 @@
             sessionId: localStorage.getItem('sessionId') || generateSessionId(),
             
             // Usuario
-            userName: 'Usuario'
+            userName: 'Usuario',
+            
+            // 🔧 Activar modo debug (cambiar a true para ver logs)
+            debug: false
         };
 
         // Guardar sessionId
@@ -389,6 +418,26 @@
 
         function generateSessionId() {
             return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // DEBUG HELPERS
+        // ═══════════════════════════════════════════════════════
+        
+        const debugPanel = document.getElementById('debugPanel');
+        const debugInfo = document.getElementById('debugInfo');
+        
+        function debugLog(message, data = null) {
+            if (CONFIG.debug) {
+                console.log(`[DEBUG] ${message}`, data || '');
+                debugPanel.classList.add('visible');
+                debugInfo.innerHTML += `<div>${message}</div>`;
+                // Mantener solo las últimas 10 líneas
+                const lines = debugInfo.querySelectorAll('div');
+                if (lines.length > 10) {
+                    lines[0].remove();
+                }
+            }
         }
 
         // ═══════════════════════════════════════════════════════
@@ -415,7 +464,8 @@
         let recordingInterval = null;
         let recordingSeconds = 0;
         let currentPhase = 1;
-        let currentMimeType = 'audio/webm'; // Variable para guardar el mimeType actual
+        let currentMimeType = 'audio/webm';
+        let audioStream = null; // ← FIX #1: Guardar referencia al stream
 
         // ═══════════════════════════════════════════════════════
         // FUNCIONES DE MENSAJES
@@ -543,54 +593,123 @@
         }
 
         // ═══════════════════════════════════════════════════════
-        // GRABACIÓN DE AUDIO - CORREGIDO PARA WHISPER
+        // GRABACIÓN DE AUDIO - ✅ CORREGIDO
         // ═══════════════════════════════════════════════════════
         
         async function startRecording() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
+                // ═══════════════════════════════════════════════════════
+                // FIX #2: Solicitar audio con configuración específica
+                // ═══════════════════════════════════════════════════════
+                audioStream = await navigator.mediaDevices.getUserMedia({ 
                     audio: {
                         echoCancellation: true,
-                        noiseSuppression: true
+                        noiseSuppression: true,
+                        sampleRate: 44100,        // ← Añadido
+                        channelCount: 1           // ← Mono es suficiente
                     } 
                 });
 
+                debugLog('Stream obtenido', audioStream.getAudioTracks()[0].getSettings());
+
                 // ═══════════════════════════════════════════════════════
-                // FIX: Seleccionar formato compatible con Whisper
-                // Orden de preferencia: mp4 > ogg > webm
+                // FIX #3: Mejor detección de formatos compatibles
                 // ═══════════════════════════════════════════════════════
-                if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                    currentMimeType = 'audio/mp4';
-                } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-                    currentMimeType = 'audio/ogg;codecs=opus';
-                } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                    currentMimeType = 'audio/webm;codecs=opus';
-                } else {
-                    currentMimeType = 'audio/webm';
+                const formatosPreferidos = [
+                    'audio/webm;codecs=opus',  // ← Más compatible con navegadores
+                    'audio/webm',
+                    'audio/ogg;codecs=opus',
+                    'audio/mp4',
+                    'audio/mpeg'
+                ];
+
+                currentMimeType = 'audio/webm'; // Default
+                for (const formato of formatosPreferidos) {
+                    if (MediaRecorder.isTypeSupported(formato)) {
+                        currentMimeType = formato;
+                        break;
+                    }
                 }
 
-                console.log('Formato de audio seleccionado:', currentMimeType);
+                debugLog('Formato seleccionado: ' + currentMimeType);
+                console.log('✅ Formato de audio seleccionado:', currentMimeType);
 
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: currentMimeType
+                // ═══════════════════════════════════════════════════════
+                // FIX #4: Configurar MediaRecorder con timeslice
+                // ═══════════════════════════════════════════════════════
+                mediaRecorder = new MediaRecorder(audioStream, {
+                    mimeType: currentMimeType,
+                    audioBitsPerSecond: 128000  // ← Bitrate específico
                 });
 
                 audioChunks = [];
                 recordingSeconds = 0;
 
+                // ═══════════════════════════════════════════════════════
+                // FIX #5: Verificar que los chunks tengan datos
+                // ═══════════════════════════════════════════════════════
                 mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
+                    debugLog(`Chunk recibido: ${event.data.size} bytes`);
+                    console.log('📦 Chunk de audio recibido:', event.data.size, 'bytes');
+                    
+                    if (event.data && event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
                 };
 
                 mediaRecorder.onstop = async () => {
-                    stream.getTracks().forEach(track => track.stop());
-                    // Usar el mimeType actual del mediaRecorder
+                    debugLog('Grabación detenida, chunks: ' + audioChunks.length);
+                    console.log('🛑 Grabación detenida. Total chunks:', audioChunks.length);
+                    
+                    // Detener el stream
+                    if (audioStream) {
+                        audioStream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    // ═══════════════════════════════════════════════════════
+                    // FIX #6: Validar que hay datos antes de enviar
+                    // ═══════════════════════════════════════════════════════
+                    if (audioChunks.length === 0) {
+                        console.error('❌ No se capturaron chunks de audio');
+                        showError('No se grabó audio. Intenta de nuevo.');
+                        hideTyping();
+                        setInputState(true);
+                        return;
+                    }
+
                     const audioBlob = new Blob(audioChunks, { type: currentMimeType });
+                    
+                    debugLog(`Blob creado: ${audioBlob.size} bytes`);
+                    console.log('📁 Blob de audio creado:', audioBlob.size, 'bytes, tipo:', audioBlob.type);
+
+                    // ═══════════════════════════════════════════════════════
+                    // FIX #7: Validar tamaño mínimo del blob
+                    // ═══════════════════════════════════════════════════════
+                    if (audioBlob.size < 1000) { // Menos de 1KB es sospechoso
+                        console.error('❌ Audio demasiado pequeño:', audioBlob.size);
+                        showError('La grabación es muy corta. Mantén presionado el botón más tiempo.');
+                        hideTyping();
+                        setInputState(true);
+                        return;
+                    }
+
                     await sendAudioMessage(audioBlob);
                 };
 
-                mediaRecorder.start();
+                mediaRecorder.onerror = (event) => {
+                    console.error('❌ Error en MediaRecorder:', event.error);
+                    showError('Error en la grabación: ' + event.error.message);
+                };
+
+                // ═══════════════════════════════════════════════════════
+                // FIX #8: Usar timeslice para capturar datos periódicamente
+                // Esto asegura que ondataavailable se llame cada 250ms
+                // ═══════════════════════════════════════════════════════
+                mediaRecorder.start(250);
                 isRecording = true;
+
+                debugLog('Grabación iniciada');
+                console.log('🎙️ Grabación iniciada con timeslice de 250ms');
 
                 // UI
                 voiceBtn.classList.add('recording');
@@ -605,14 +724,23 @@
                 }, 1000);
 
             } catch (error) {
-                console.error('Error accediendo al micrófono:', error);
+                console.error('❌ Error accediendo al micrófono:', error);
                 showError('No se pudo acceder al micrófono. Verifica los permisos.');
             }
         }
 
         function stopRecording() {
             if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
+                debugLog('Deteniendo grabación...');
+                console.log('⏹️ Deteniendo grabación...');
+                
+                // ═══════════════════════════════════════════════════════
+                // FIX #9: Verificar estado antes de detener
+                // ═══════════════════════════════════════════════════════
+                if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+                
                 isRecording = false;
 
                 // UI
@@ -633,12 +761,22 @@
             addMessage('🎤 [Mensaje de voz]', 'user', 'audio');
 
             try {
-                // Convertir a base64
+                // ═══════════════════════════════════════════════════════
+                // FIX #10: Convertir a base64 con validación
+                // ═══════════════════════════════════════════════════════
                 const base64Audio = await blobToBase64(audioBlob);
+                
+                // Validar que el base64 tenga contenido real
+                const base64Content = base64Audio.split(',')[1] || '';
+                
+                debugLog(`Base64 length: ${base64Content.length}`);
+                console.log('📤 Base64 generado, longitud:', base64Content.length);
+                
+                if (base64Content.length < 100) {
+                    throw new Error('Audio base64 vacío o corrupto');
+                }
 
-                // ═══════════════════════════════════════════════════════
-                // FIX: Detectar el formato correcto para enviar
-                // ═══════════════════════════════════════════════════════
+                // Detectar el formato correcto para enviar
                 let audioFormat = 'webm'; // default
                 if (currentMimeType.includes('mp4')) {
                     audioFormat = 'mp4';
@@ -646,43 +784,79 @@
                     audioFormat = 'ogg';
                 } else if (currentMimeType.includes('webm')) {
                     audioFormat = 'webm';
+                } else if (currentMimeType.includes('mpeg')) {
+                    audioFormat = 'mp3';
                 }
 
-                console.log('Enviando audio en formato:', audioFormat);
+                console.log('📤 Enviando audio en formato:', audioFormat);
+                debugLog(`Enviando: ${audioFormat}, ${base64Content.length} chars`);
+
+                const payload = {
+                    audioBase64: base64Audio,  // ← Incluye el prefijo data:audio/...
+                    audioData: base64Audio,    // ← Campo alternativo por si n8n lo busca así
+                    audioFormat: audioFormat,
+                    sessionId: CONFIG.sessionId,
+                    userName: CONFIG.userName,
+                    source: 'web'
+                };
+
+                console.log('📦 Payload a enviar:', {
+                    ...payload,
+                    audioBase64: payload.audioBase64.substring(0, 50) + '...[truncado]',
+                    audioData: payload.audioData.substring(0, 50) + '...[truncado]'
+                });
 
                 const response = await fetch(CONFIG.webhookUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        audioBase64: base64Audio,
-                        audioFormat: audioFormat,
-                        sessionId: CONFIG.sessionId,
-                        userName: CONFIG.userName,
-                        source: 'web'
-                    })
+                    body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) throw new Error('Error en la respuesta');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Error del servidor:', errorText);
+                    throw new Error('Error en la respuesta: ' + response.status);
+                }
 
                 const data = await response.json();
+                console.log('✅ Respuesta recibida:', data);
                 handleResponse(data);
 
             } catch (error) {
-                console.error('Error:', error);
-                showError('Error al procesar el audio. Intenta de nuevo.');
+                console.error('❌ Error:', error);
+                showError('Error al procesar el audio: ' + error.message);
                 hideTyping();
             } finally {
                 setInputState(true);
             }
         }
 
+        // ═══════════════════════════════════════════════════════
+        // FIX #11: Función mejorada de conversión a base64
+        // ═══════════════════════════════════════════════════════
         function blobToBase64(blob) {
             return new Promise((resolve, reject) => {
+                if (!blob || blob.size === 0) {
+                    reject(new Error('Blob vacío'));
+                    return;
+                }
+
                 const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
+                
+                reader.onloadend = () => {
+                    if (reader.result) {
+                        resolve(reader.result);
+                    } else {
+                        reject(new Error('FileReader no produjo resultado'));
+                    }
+                };
+                
+                reader.onerror = () => {
+                    reject(new Error('Error leyendo el blob: ' + reader.error));
+                };
+                
                 reader.readAsDataURL(blob);
             });
         }
@@ -703,7 +877,18 @@
             } else if (data.output) {
                 // Formato alternativo
                 addMessage(data.output, 'assistant');
+            } else if (data.text) {
+                // Otro formato posible
+                addMessage(data.text, 'assistant');
+            } else if (data.message) {
+                // Otro formato posible
+                addMessage(data.message, 'assistant');
+            } else if (data.error) {
+                // Error del servidor
+                console.error('Error del servidor:', data);
+                addMessage('Error: ' + (data.errorMessage || data.error), 'assistant');
             } else {
+                console.warn('Respuesta no reconocida:', data);
                 addMessage('Lo siento, hubo un problema. ¿Puedes repetir?', 'assistant');
             }
         }
@@ -756,6 +941,12 @@
         
         // Mensaje de bienvenida automático al cargar
         window.addEventListener('load', () => {
+            // Mostrar formatos soportados en consola
+            console.log('🎵 Formatos de audio soportados:');
+            ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/mpeg'].forEach(format => {
+                console.log(`   ${format}: ${MediaRecorder.isTypeSupported(format) ? '✅' : '❌'}`);
+            });
+
             // Enviar mensaje inicial para activar el agente
             setTimeout(async () => {
                 showTyping();
@@ -784,6 +975,17 @@
             voiceBtn.disabled = true;
             voiceBtn.title = 'Tu navegador no soporta grabación de audio';
         }
+
+        // ═══════════════════════════════════════════════════════
+        // DEBUG: Activar con Ctrl+Shift+D
+        // ═══════════════════════════════════════════════════════
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                CONFIG.debug = !CONFIG.debug;
+                debugPanel.classList.toggle('visible', CONFIG.debug);
+                console.log('🔧 Debug mode:', CONFIG.debug ? 'ON' : 'OFF');
+            }
+        });
     </script>
 </body>
 </html>
