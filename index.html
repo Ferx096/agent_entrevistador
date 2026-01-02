@@ -2,25 +2,40 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Entrevista | InAdvance</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #0A1628;
-            --primary-light: #1a2d4a;
-            --accent: #00D4AA;
-            --accent-hover: #00F5C4;
-            --accent-dim: rgba(0, 212, 170, 0.1);
-            --surface: #0F1C2E;
-            --surface-elevated: #162338;
-            --text-primary: #FFFFFF;
-            --text-secondary: #8B9CB6;
-            --text-muted: #5A6B85;
-            --border: rgba(255, 255, 255, 0.08);
-            --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            /* Colores InAdvance - Paleta real */
+            --primary: #FFFFFF;
+            --primary-dark: #1A1A1A;
+            --magenta: #C41E68;
+            --magenta-dark: #9B1854;
+            --magenta-light: #E91E7B;
+            --burgundy: #8B1A4A;
+            --accent: #C41E68;
+            --accent-hover: #E91E7B;
+            --accent-dim: rgba(196, 30, 104, 0.1);
+            
+            /* Superficies */
+            --surface: #FAFAFA;
+            --surface-elevated: #FFFFFF;
+            --surface-dark: #2D2D2D;
+            
+            /* Textos */
+            --text-primary: #1A1A1A;
+            --text-secondary: #666666;
+            --text-muted: #999999;
+            --text-on-accent: #FFFFFF;
+            
+            /* Bordes y sombras */
+            --border: rgba(0, 0, 0, 0.08);
+            --border-dark: rgba(0, 0, 0, 0.12);
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            --shadow-strong: 0 8px 32px rgba(0, 0, 0, 0.12);
         }
 
         * {
@@ -29,82 +44,94 @@
             box-sizing: border-box;
         }
 
+        html {
+            height: 100%;
+            height: -webkit-fill-available;
+        }
+
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--magenta) 0%, var(--burgundy) 50%, var(--magenta-dark) 100%);
             color: var(--text-primary);
-            height: 100vh;
+            min-height: 100%;
+            min-height: -webkit-fill-available;
             overflow: hidden;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
         }
 
         .app-container {
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            max-width: 1400px;
+            height: 100dvh; /* Dynamic viewport height - mejor soporte móvil */
+            max-width: 900px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 16px;
         }
 
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 24px;
-            background: var(--surface);
-            border-radius: 16px;
-            margin-bottom: 16px;
-            border: 1px solid var(--border);
+            padding: 14px 20px;
+            background: var(--surface-elevated);
+            border-radius: 14px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+            flex-shrink: 0;
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, var(--accent), #00A888);
-            border-radius: 10px;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--magenta), var(--burgundy));
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
         .logo-icon svg {
-            width: 22px;
-            height: 22px;
-            fill: var(--primary);
+            width: 20px;
+            height: 20px;
+            fill: white;
         }
 
         .logo-text {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 600;
             letter-spacing: -0.02em;
+            color: var(--text-primary);
         }
 
         .logo-text span {
-            color: var(--accent);
+            color: var(--magenta);
         }
 
         .status-indicator {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
+            gap: 6px;
+            padding: 6px 12px;
             background: var(--accent-dim);
-            border-radius: 20px;
-            font-size: 13px;
-            color: var(--accent);
+            border-radius: 16px;
+            font-size: 12px;
+            color: var(--magenta);
             font-weight: 500;
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--accent);
+            width: 6px;
+            height: 6px;
+            background: var(--magenta);
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
@@ -118,9 +145,9 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: var(--surface);
-            border-radius: 20px;
-            border: 1px solid var(--border);
+            background: var(--surface-elevated);
+            border-radius: 18px;
+            box-shadow: var(--shadow-strong);
             overflow: hidden;
             min-height: 0;
         }
@@ -128,14 +155,15 @@
         .messages-area {
             flex: 1;
             overflow-y: auto;
-            padding: 24px;
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
+            -webkit-overflow-scrolling: touch;
         }
 
         .messages-area::-webkit-scrollbar {
-            width: 6px;
+            width: 5px;
         }
 
         .messages-area::-webkit-scrollbar-track {
@@ -143,19 +171,19 @@
         }
 
         .messages-area::-webkit-scrollbar-thumb {
-            background: var(--text-muted);
+            background: var(--border-dark);
             border-radius: 3px;
         }
 
         .message {
-            max-width: 75%;
+            max-width: 80%;
             animation: messageIn 0.3s ease-out;
         }
 
         @keyframes messageIn {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(8px);
             }
             to {
                 opacity: 1;
@@ -172,30 +200,30 @@
         }
 
         .message-content {
-            padding: 14px 18px;
-            border-radius: 16px;
-            font-size: 15px;
-            line-height: 1.6;
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.55;
             letter-spacing: -0.01em;
         }
 
         .message.user .message-content {
-            background: linear-gradient(135deg, var(--accent), #00A888);
-            color: var(--primary);
+            background: linear-gradient(135deg, var(--magenta), var(--burgundy));
+            color: var(--text-on-accent);
             border-bottom-right-radius: 4px;
         }
 
         .message.assistant .message-content {
-            background: var(--surface-elevated);
+            background: var(--surface);
             color: var(--text-primary);
             border: 1px solid var(--border);
             border-bottom-left-radius: 4px;
         }
 
         .message-meta {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-muted);
-            margin-top: 6px;
+            margin-top: 5px;
             padding: 0 4px;
         }
 
@@ -207,17 +235,17 @@
             display: flex;
             align-items: center;
             gap: 4px;
-            padding: 14px 18px;
-            background: var(--surface-elevated);
-            border-radius: 16px;
+            padding: 12px 16px;
+            background: var(--surface);
+            border-radius: 14px;
             border: 1px solid var(--border);
             width: fit-content;
         }
 
         .typing-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--accent);
+            width: 7px;
+            height: 7px;
+            background: var(--magenta);
             border-radius: 50%;
             animation: typingBounce 1.4s infinite;
         }
@@ -227,28 +255,30 @@
 
         @keyframes typingBounce {
             0%, 60%, 100% { transform: translateY(0); }
-            30% { transform: translateY(-6px); }
+            30% { transform: translateY(-5px); }
         }
 
         .input-area {
-            padding: 20px 24px;
-            background: var(--primary-light);
+            padding: 14px 16px;
+            background: var(--surface);
             border-top: 1px solid var(--border);
+            flex-shrink: 0;
         }
 
         .input-wrapper {
             display: flex;
             align-items: flex-end;
-            gap: 12px;
+            gap: 10px;
             background: var(--surface-elevated);
-            border-radius: 16px;
-            padding: 12px 16px;
-            border: 1px solid var(--border);
-            transition: border-color 0.2s;
+            border-radius: 14px;
+            padding: 10px 14px;
+            border: 1px solid var(--border-dark);
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         .input-wrapper:focus-within {
-            border-color: var(--accent);
+            border-color: var(--magenta);
+            box-shadow: 0 0 0 3px var(--accent-dim);
         }
 
         .text-input {
@@ -260,8 +290,8 @@
             font-family: inherit;
             font-size: 15px;
             resize: none;
-            max-height: 120px;
-            line-height: 1.5;
+            max-height: 100px;
+            line-height: 1.4;
         }
 
         .text-input::placeholder {
@@ -271,13 +301,13 @@
         .input-actions {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .btn-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
             border: none;
             cursor: pointer;
             display: flex;
@@ -287,13 +317,13 @@
         }
 
         .btn-icon svg {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
         }
 
         .btn-record {
             background: var(--surface);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-dark);
         }
 
         .btn-record svg {
@@ -301,17 +331,17 @@
         }
 
         .btn-record:hover {
-            background: var(--primary-light);
-            border-color: var(--accent);
+            background: var(--accent-dim);
+            border-color: var(--magenta);
         }
 
         .btn-record:hover svg {
-            fill: var(--accent);
+            fill: var(--magenta);
         }
 
         .btn-record.recording {
-            background: #FF4757;
-            border-color: #FF4757;
+            background: #E53E3E;
+            border-color: #E53E3E;
             animation: recordPulse 1s infinite;
         }
 
@@ -320,25 +350,26 @@
         }
 
         @keyframes recordPulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
-            50% { box-shadow: 0 0 0 8px rgba(255, 71, 87, 0); }
+            0%, 100% { box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.4); }
+            50% { box-shadow: 0 0 0 6px rgba(229, 62, 62, 0); }
         }
 
         .btn-send {
-            background: linear-gradient(135deg, var(--accent), #00A888);
+            background: linear-gradient(135deg, var(--magenta), var(--burgundy));
         }
 
         .btn-send svg {
-            fill: var(--primary);
+            fill: white;
         }
 
         .btn-send:hover {
-            background: linear-gradient(135deg, var(--accent-hover), #00C49A);
+            background: linear-gradient(135deg, var(--magenta-light), var(--magenta));
             transform: scale(1.05);
         }
 
         .btn-send:disabled {
             background: var(--surface);
+            border: 1px solid var(--border);
             cursor: not-allowed;
             transform: none;
         }
@@ -349,86 +380,163 @@
 
         .welcome-message {
             text-align: center;
-            padding: 60px 40px;
-            max-width: 500px;
+            padding: 40px 30px;
+            max-width: 400px;
             margin: auto;
         }
 
         .welcome-icon {
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
             background: var(--accent-dim);
-            border-radius: 20px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 24px;
+            margin: 0 auto 20px;
         }
 
         .welcome-icon svg {
-            width: 40px;
-            height: 40px;
-            fill: var(--accent);
+            width: 35px;
+            height: 35px;
+            fill: var(--magenta);
         }
 
         .welcome-title {
-            font-size: 24px;
+            font-size: 21px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             letter-spacing: -0.02em;
+            color: var(--text-primary);
         }
 
         .welcome-subtitle {
             color: var(--text-secondary);
-            font-size: 15px;
-            line-height: 1.6;
+            font-size: 14px;
+            line-height: 1.5;
         }
 
         .audio-badge {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            background: var(--accent-dim);
-            border-radius: 6px;
-            font-size: 11px;
-            color: var(--accent);
-            margin-bottom: 8px;
+            gap: 5px;
+            padding: 3px 8px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 5px;
+            font-size: 10px;
+            color: white;
+            margin-bottom: 6px;
         }
 
         .audio-badge svg {
-            width: 12px;
-            height: 12px;
-            fill: var(--accent);
+            width: 10px;
+            height: 10px;
+            fill: white;
+        }
+
+        /* Fix específico para móviles */
+        @supports (-webkit-touch-callout: none) {
+            .app-container {
+                height: -webkit-fill-available;
+            }
         }
 
         @media (max-width: 768px) {
             .app-container {
-                padding: 12px;
+                padding: 10px;
+                padding-bottom: env(safe-area-inset-bottom, 10px);
             }
 
             .header {
-                padding: 12px 16px;
+                padding: 10px 14px;
+                margin-bottom: 10px;
+            }
+
+            .logo-icon {
+                width: 32px;
+                height: 32px;
             }
 
             .logo-text {
-                font-size: 16px;
+                font-size: 15px;
+            }
+
+            .status-indicator {
+                padding: 5px 10px;
+                font-size: 11px;
             }
 
             .messages-area {
-                padding: 16px;
+                padding: 14px;
             }
 
             .message {
-                max-width: 85%;
+                max-width: 88%;
+            }
+
+            .message-content {
+                padding: 10px 14px;
+                font-size: 14px;
             }
 
             .input-area {
-                padding: 16px;
+                padding: 12px;
+            }
+
+            .input-wrapper {
+                padding: 8px 12px;
+            }
+
+            .text-input {
+                font-size: 16px; /* Previene zoom en iOS */
+            }
+
+            .btn-icon {
+                width: 38px;
+                height: 38px;
             }
 
             .welcome-message {
-                padding: 40px 20px;
+                padding: 30px 20px;
+            }
+
+            .welcome-icon {
+                width: 60px;
+                height: 60px;
+            }
+
+            .welcome-icon svg {
+                width: 30px;
+                height: 30px;
+            }
+
+            .welcome-title {
+                font-size: 19px;
+            }
+
+            .welcome-subtitle {
+                font-size: 13px;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .welcome-message {
+                padding: 20px 15px;
+            }
+            
+            .welcome-icon {
+                width: 50px;
+                height: 50px;
+                margin-bottom: 14px;
+            }
+
+            .welcome-title {
+                font-size: 17px;
+                margin-bottom: 6px;
+            }
+
+            .welcome-subtitle {
+                font-size: 12px;
             }
         }
     </style>
@@ -494,11 +602,27 @@
         let isRecording = false;
         let sessionId = `session_${Date.now()}`;
 
+        // Fix para altura en móviles
+        function setVH() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        setVH();
+        window.addEventListener('resize', setVH);
+
         // Auto-resize textarea
         textInput.addEventListener('input', () => {
             textInput.style.height = 'auto';
-            textInput.style.height = Math.min(textInput.scrollHeight, 120) + 'px';
+            textInput.style.height = Math.min(textInput.scrollHeight, 100) + 'px';
             sendBtn.disabled = !textInput.value.trim();
+        });
+
+        // Prevenir zoom en iOS al hacer focus
+        textInput.addEventListener('focus', () => {
+            setTimeout(() => {
+                window.scrollTo(0, 0);
+                document.body.scrollTop = 0;
+            }, 100);
         });
 
         // Send on Enter (Shift+Enter for new line)
