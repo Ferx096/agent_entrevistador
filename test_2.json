@@ -1,0 +1,787 @@
+{
+  "name": "test_2",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2544,
+        192
+      ],
+      "id": "9a20292a-2283-4211-ba79-8836cdd73b07",
+      "name": "input"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userMessage }}",
+        "options": {
+          "systemMessage": "=Eres un Analista de Procesos experto. Tu trabajo es entrevistar al usuario para documentar su proceso de negocio de forma completa y detallada.\n\n## PROCESO EN DOCUMENTACIÓN\nNombre: {{ $json.processData.nombreProceso || 'Por definir' }}\n\n## PASOS IDENTIFICADOS\n{{ $json.processData.pasos && $json.processData.pasos.length > 0 ? JSON.stringify($json.processData.pasos, null, 2) : 'Ninguno aún' }}\n\n## FEEDBACK DEL REVISOR\n{{ $json.feedbackCritic || 'Sin feedback aún' }}\n\n## MENSAJE DEL USUARIO\n\"{{ $json.userMessage }}\"\n\n## TU TRABAJO\n\n1. **Si es inicio de conversación:**\n   - Saluda brevemente y pregunta qué proceso quiere documentar\n\n2. **Si el usuario está describiendo el proceso:**\n   - ESCUCHA atentamente y EXTRAE cada paso que mencione\n   - HAZ UNA SOLA PREGUNTA por mensaje (la más importante)\n   - Prioriza obtener en orden: actividad → responsable → sistema → decisiones\n   \n3. **Si hay FEEDBACK DEL REVISOR:**\n   - Sigue las indicaciones del revisor\n   - Pregunta lo que el revisor identificó como faltante\n\n4. **Si el usuario dice que terminó o confirmó que está completo:**\n   - Si NO tienes su email: Pide SOLO el correo electrónico\n   - Si YA tienes su email: Indica que generarás el reporte (NO pidas más confirmación)\n\n## REGLAS CRÍTICAS\n- ⚠️ SOLO 1 PREGUNTA POR MENSAJE - NUNCA 2 o más\n- ⚠️ NO pidas confirmación si el usuario ya confirmó que está completo\n- ⚠️ NO hagas preguntas redundantes sobre lo que ya respondió\n- Sé conversacional, no como formulario\n- Detecta bifurcaciones (si/no, aprobado/rechazado, viable/no viable)\n- Cuando detectes una bifurcación, pregunta qué pasa en CADA caso\n\n## ⚠️ REGLAS CRÍTICAS PARA BIFURCACIONES/DECISIONES\n\nCuando el usuario mencione una decisión o bifurcación, DEBES extraer:\n1. **etiqueta_si**: La palabra/frase EXACTA que usa el usuario para el camino positivo\n2. **etiqueta_no**: La palabra/frase EXACTA que usa el usuario para el camino negativo\n3. **destino_si**: A qué paso va si es positivo (normalmente el siguiente)\n4. **destino_no**: A qué paso va si es negativo (puede regresar, terminar, o ir a otro paso)\n\nEjemplos de cómo extraer:\n- Usuario dice: \"si el resultado es positivo continúa, si es negativo se reevalúa\"\n  → etiqueta_si: \"Positivo\", etiqueta_no: \"Negativo\", destino_no: \"Reevaluar\"\n  \n- Usuario dice: \"el jefe aprueba o rechaza la solicitud\"\n  → etiqueta_si: \"Aprobado\", etiqueta_no: \"Rechazado\"\n  \n- Usuario dice: \"verificamos si hay stock disponible\"\n  → etiqueta_si: \"Stock disponible\", etiqueta_no: \"Sin stock\"\n\n- Usuario dice: \"el cliente decide si acepta la propuesta\"\n  → etiqueta_si: \"Cliente acepta\", etiqueta_no: \"Cliente rechaza\"\n\n## FORMATO DE TU RESPUESTA\n\nResponde SIEMPRE en JSON válido:\n{\n  \"mensaje_usuario\": \"tu respuesta al usuario aquí (con UNA sola pregunta si aplica)\",\n  \"pasos_extraidos\": [\n    {\n      \"numero\": 1,\n      \"nombre\": \"nombre del paso\",\n      \"responsable\": \"rol o cargo\",\n      \"sistema\": \"herramienta usada\",\n      \"entrada\": \"qué recibe\",\n      \"salida\": \"qué produce\",\n      \"es_decision\": true/false,\n      \"etiqueta_si\": \"texto exacto para rama positiva (ej: Aprobado, Positivo, Cumple)\",\n      \"etiqueta_no\": \"texto exacto para rama negativa (ej: Rechazado, Negativo, No cumple)\",\n      \"destino_si\": \"siguiente/paso N/fin\",\n      \"destino_no\": \"reevaluar/paso N/fin/cancelar\"\n    }\n  ],\n  \"nombre_proceso\": \"nombre del proceso si lo mencionó\",\n  \"usuario_finalizo\": true/false,\n  \"email_extraido\": \"email si lo mencionó\"\n}\n\n## IMPORTANTE SOBRE DECISIONES\n- Si un paso NO tiene decisión: es_decision = false, y los campos etiqueta_* y destino_* pueden omitirse\n- Si un paso SÍ tiene decisión: es_decision = true, y DEBES incluir etiqueta_si, etiqueta_no, destino_si, destino_no\n- USA LAS PALABRAS EXACTAS DEL USUARIO, no las traduzcas a \"Sí/No\" genérico\n- Rigete a estos pasos al momento de organizar toda la informacion extraida:\n  -FASE 1: RECOLECCIÓN DE INFORMACIÓN (PRIORIDAD MÁXIMA). NUNCA pedir el correo durante esta fase.\n  - FASE 2: CONFIRMACIÓN (Solo después de tener información completa). Mostrar resumen y preguntar si hay algo más\n  - FASE 3: SOLICITUD DE EMAIL Y ENVÍO (SOLO AL FINAL). ÚNICAMENTE cuando el usuario confirme que está completo\n  - Una vez recibido el email, NO hacer más preguntas y despedirte\n\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -1648,
+        176
+      ],
+      "id": "e1a01eb0-196c-4149-b2c9-d99a5ef93343",
+      "name": "ACTOR"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Evalúa el proceso documentado",
+        "options": {
+          "systemMessage": "=Eres un Revisor de Calidad de documentación de procesos. Tu trabajo es evaluar si la información extraída está completa y es suficiente para generar un diagrama de flujo profesional.\n\n## PROCESO EN DOCUMENTACIÓN\nNombre: {{ $json.processData.nombreProceso || 'Sin definir' }}\n\n## PASOS DOCUMENTADOS\n{{ JSON.stringify($json.processData.pasos || [], null, 2) }}\n\n## CANTIDAD DE PASOS\n{{ $json.cantidadPasos || 0 }}\n\n## EL USUARIO INDICÓ QUE TERMINÓ\n{{ $json.usuarioFinalizo }}\n\n## EMAIL DEL USUARIO\n{{ $json.emailUsuario || 'No proporcionado' }}\n\n---\n\n## TU TRABAJO\n\nEvalúa la información y responde SOLO en JSON válido:\n\n{\n  \"proceso_completo\": true/false,\n  \"calidad_score\": 1-10,\n  \"huecos_detectados\": [\"lista de lo que falta\"],\n  \"feedback_actor\": \"instrucción para el Actor si falta algo\",\n  \"listo_para_reporte\": true/false,\n  \"razon\": \"explicación breve\"\n}\n\n## CRITERIOS DE EVALUACIÓN\n\n### Para cada PASO verifica:\n- ¿Tiene nombre claro?\n- ¿Se sabe quién lo hace (responsable)?\n- ¿Se conoce el sistema/herramienta?\n- ¿Se identificaron decisiones/bifurcaciones?\n\n### Para FINALIZAR verifica:\n- Hay al menos 2 pasos documentados\n- El usuario dijo que terminó\n- Tiene email para enviar el reporte\n\n## REGLAS DE DECISIÓN\n\n**listo_para_reporte = true** cuando:\n- El usuario indicó que terminó (usuarioFinalizo = true)\n- Tiene email del usuario\n- Hay al menos 2 pasos documentados\n\n**listo_para_reporte = false** cuando:\n- No tiene email → feedback_actor = \"Pide el correo electrónico al usuario\"\n- Menos de 2 pasos → feedback_actor = \"Continúa documentando el proceso\"\n\n## ⚠️ REGLAS CRÍTICAS - ANTI-REDUNDANCIA\n\n- Si el usuario YA CONFIRMÓ que el proceso está completo, NO pidas otra confirmación\n- Si el usuario YA DIO su email, NO lo pidas de nuevo\n- Si ya tienes pasos + confirmación + email → listo_para_reporte = true INMEDIATAMENTE\n- NUNCA sugieras al Actor que pida \"confirmar\" algo que ya fue confirmado\n- El feedback_actor SOLO debe pedir información que REALMENTE FALTA\n\n## IMPORTANTE\nFASE 1: Si falta información → continuar preguntando (NO pedir email)\nFASE 2: Si está documentado pero NO confirmado → pedir confirmación (NO pedir email)\nFASE 3: Si está completo y confirmado pero NO tiene email → pedir email\nFASE 4: Si tiene todo → listo_para_reporte = true INMEDIATAMENTE\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -1072,
+        176
+      ],
+      "id": "b6a46312-a07a-410e-a0c4-8e9db8a86fc4",
+      "name": "CRITIC"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// NODO: Procesar_Critic\n// =====================================================\n\nconst criticOutput = $input.first().json;\nconst actorData = $('Procesar_Actor').first().json;\n\n// =====================================================\n// PARSEAR RESPUESTA DEL CRITIC\n// =====================================================\n\nlet criticResponse;\ntry {\n  const output = criticOutput.output || criticOutput.text || '';\n  let cleanOutput = output.trim();\n  \n  const jsonMatch = cleanOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    cleanOutput = jsonMatch[0];\n  }\n  \n  criticResponse = JSON.parse(cleanOutput);\n} catch (e) {\n  criticResponse = {\n    proceso_completo: false,\n    calidad_score: 0,\n    huecos_detectados: ['Error al procesar evaluación'],\n    feedback_actor: 'Continúa recopilando información del proceso',\n    listo_para_reporte: false,\n    razon: 'Error de parseo'\n  };\n}\n\n// =====================================================\n// DETERMINAR SIGUIENTE ACCIÓN\n// =====================================================\n\nconst listoParaReporte = criticResponse.listo_para_reporte || false;\nconst feedbackCritic = criticResponse.feedback_actor || '';\n\n// Actualizar sesión\nlet session = actorData.session;\nsession.feedbackCritic = feedbackCritic;\n\n// =====================================================\n// PREPARAR RESPUESTA AL USUARIO\n// =====================================================\n\nlet outputFinal = actorData.mensajeActor;\n\nif (listoParaReporte) {\n  outputFinal = actorData.mensajeActor + '\\n\\n✅ Proceso documentado. Generando reporte y enviándolo a tu correo...';\n}\n\n// =====================================================\n// RETORNAR DATOS\n// =====================================================\n\nreturn [{\n  json: {\n    output: outputFinal,\n    sessionId: actorData.sessionId,\n    session: session,\n    processData: actorData.processData,\n    isNewSession: actorData.isNewSession,\n    emailUsuario: actorData.emailUsuario,\n    \n    // Decisión del Critic\n    listoParaReporte: listoParaReporte,\n    procesoCompleto: criticResponse.proceso_completo,\n    calidadScore: criticResponse.calidad_score,\n    feedbackCritic: feedbackCritic,\n    \n    // Para Data Table\n    current_phase: listoParaReporte ? 2 : 1,\n    process_data: JSON.stringify(actorData.processData),\n    conversation: JSON.stringify(session.conversation || []),\n    email_usuario: actorData.emailUsuario,\n    \n    // Flag para generar reporte\n    generarReporte: listoParaReporte\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        176
+      ],
+      "id": "12a518e8-c4a0-4ff2-8602-350b540e9445",
+      "name": "Procesar_Critic"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// NODO: Procesar_Actor\n// =====================================================\n\nconst actorOutput = $input.first().json;\nconst sessionData = $('preparar_sesion1').first().json;\n\nlet session = sessionData.session || {};\nlet processData = session.processData || {\n  nombreProceso: '',\n  pasos: [],\n  informacionExtraida: ''\n};\n\n// =====================================================\n// PARSEAR RESPUESTA DEL ACTOR\n// =====================================================\n\nlet actorResponse;\ntry {\n  const output = actorOutput.output || actorOutput.text || '';\n  let cleanOutput = output.trim();\n  \n  // Extraer JSON si viene con texto\n  const jsonMatch = cleanOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    cleanOutput = jsonMatch[0];\n  }\n  \n  actorResponse = JSON.parse(cleanOutput);\n} catch (e) {\n  // Si no es JSON, tratar como mensaje directo\n  actorResponse = {\n    mensaje_usuario: actorOutput.output || actorOutput.text || 'Error procesando respuesta',\n    pasos_extraidos: [],\n    nombre_proceso: null,\n    usuario_finalizo: false,\n    email_extraido: null\n  };\n}\n\n// =====================================================\n// ACTUALIZAR DATOS DEL PROCESO\n// =====================================================\n\nif (actorResponse.nombre_proceso) {\n  processData.nombreProceso = actorResponse.nombre_proceso;\n}\n\n// Actualizar email si se extrajo\nlet emailUsuario = session.emailUsuario || '';\nif (actorResponse.email_extraido) {\n  emailUsuario = actorResponse.email_extraido;\n}\n\n// Agregar/actualizar pasos extraídos\nif (actorResponse.pasos_extraidos && actorResponse.pasos_extraidos.length > 0) {\n  actorResponse.pasos_extraidos.forEach(nuevoPaso => {\n    const existente = processData.pasos.find(p => p.numero === nuevoPaso.numero);\n    if (existente) {\n      Object.assign(existente, nuevoPaso);\n    } else {\n      processData.pasos.push(nuevoPaso);\n    }\n  });\n  processData.pasos.sort((a, b) => a.numero - b.numero);\n}\n\n// Actualizar sesión\nsession.processData = processData;\nsession.emailUsuario = emailUsuario;\n\n// =====================================================\n// RETORNAR DATOS PARA EL CRITIC\n// =====================================================\n\nreturn [{\n  json: {\n    mensajeActor: actorResponse.mensaje_usuario,\n    sessionId: sessionData.sessionId,\n    userMessage: sessionData.userMessage,\n    session: session,\n    processData: processData,\n    isNewSession: sessionData.isNewSession,\n    usuarioFinalizo: actorResponse.usuario_finalizo || false,\n    emailUsuario: emailUsuario,\n    pasosActuales: processData.pasos,\n    cantidadPasos: processData.pasos.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1296,
+        176
+      ],
+      "id": "69160f86-ecbf-47da-a5c9-3fdbe42c0949",
+      "name": "Procesar_Actor"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5d851d6d-b14a-41c7-807e-c102eeb50030",
+              "leftValue": "={{ $json.generarReporte }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -496,
+        176
+      ],
+      "id": "dd6542c5-c348-4db7-9841-41e492960232",
+      "name": "If_Reporte"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// NODO: Generar_Reporte MEJORADO\n// =====================================================\n// INSTRUCCIONES: Copia este código y reemplaza el contenido\n// del nodo \"Generar_Reporte\" en n8n\n// =====================================================\n\nconst data = $input.first().json;\nconst pd = data.processData || {};\nconst pasos = pd.pasos || [];\n\n// =====================================================\n// GENERAR DIAGRAMA MERMAID CON ETIQUETAS DINÁMICAS\n// =====================================================\n\nfunction generarDiagramaMermaid(pasos) {\n  if (!pasos || pasos.length === 0) {\n    return 'graph TD\\n  A[Sin pasos documentados]';\n  }\n  \n  let mermaid = 'graph TD\\n';\n  mermaid += '  classDef inicio fill:#10b981,stroke:#047857,color:#fff,stroke-width:3px\\n';\n  mermaid += '  classDef paso fill:#3b82f6,stroke:#1d4ed8,color:#fff,stroke-width:2px\\n';\n  mermaid += '  classDef decision fill:#f59e0b,stroke:#d97706,color:#fff,stroke-width:2px\\n';\n  mermaid += '  classDef fin fill:#8b5cf6,stroke:#6d28d9,color:#fff,stroke-width:3px\\n';\n  mermaid += '  classDef rechazado fill:#ef4444,stroke:#dc2626,color:#fff,stroke-width:2px\\n\\n';\n  \n  mermaid += '  INICIO((\"🚀 INICIO\")):::inicio\\n\\n';\n  \n  let usaRechazado = false;\n  \n  // Generar nodos\n  pasos.forEach((paso, index) => {\n    const id = `P${index + 1}`;\n    const nombre = (paso.nombre || 'Sin nombre').substring(0, 35);\n    const responsable = paso.responsable ? `\\\\n👤 ${paso.responsable.substring(0, 25)}` : '';\n    const sistema = paso.sistema ? `\\\\n💻 ${paso.sistema.substring(0, 25)}` : '';\n    const nombreEscapado = (nombre + responsable + sistema)\n      .replace(/\"/g, \"'\")\n      .replace(/\\[/g, '(')\n      .replace(/\\]/g, ')')\n      .replace(/#/g, 'No.');\n    \n    // Usar el nuevo campo es_decision, o fallback al método anterior\n    const esDecision = paso.es_decision === true || (\n      paso.etiqueta_si && paso.etiqueta_no\n    ) || (\n      paso.decisiones && \n      paso.decisiones.trim().length > 2 &&\n      paso.decisiones.toLowerCase() !== 'no' && \n      paso.decisiones.toLowerCase() !== 'n/a' &&\n      paso.decisiones !== '-' &&\n      paso.decisiones !== 'ninguna'\n    );\n    \n    if (esDecision) {\n      mermaid += `  ${id}{\"${index + 1}. ${nombreEscapado}\"}:::decision\\n`;\n    } else {\n      mermaid += `  ${id}[\"${index + 1}. ${nombreEscapado}\"]:::paso\\n`;\n    }\n  });\n  \n  mermaid += '\\n  FIN((\"✅ FIN\")):::fin\\n';\n  mermaid += '  RECHAZADO((\"🔄 Reevaluar\")):::rechazado\\n\\n';\n  \n  // Generar conexiones\n  mermaid += '  INICIO --> P1\\n';\n  \n  for (let i = 0; i < pasos.length; i++) {\n    const paso = pasos[i];\n    const currentId = `P${i + 1}`;\n    const nextId = i < pasos.length - 1 ? `P${i + 2}` : 'FIN';\n    \n    // Determinar si es decisión\n    const esDecision = paso.es_decision === true || (\n      paso.etiqueta_si && paso.etiqueta_no\n    ) || (\n      paso.decisiones && \n      paso.decisiones.trim().length > 2 &&\n      paso.decisiones.toLowerCase() !== 'no' && \n      paso.decisiones.toLowerCase() !== 'n/a' &&\n      paso.decisiones !== '-'\n    );\n    \n    if (esDecision) {\n      // =====================================================\n      // OBTENER ETIQUETAS - PRIORIDAD A LOS NUEVOS CAMPOS\n      // =====================================================\n      let etiquetaSi = paso.etiqueta_si || '✅ Sí';\n      let etiquetaNo = paso.etiqueta_no || '❌ No';\n      \n      // Si no hay etiquetas nuevas, intentar extraer del campo decisiones (fallback)\n      if (!paso.etiqueta_si && paso.decisiones) {\n        const extraidas = extraerEtiquetasDesdeCampoDecisiones(paso.decisiones);\n        etiquetaSi = extraidas.si;\n        etiquetaNo = extraidas.no;\n      }\n      \n      // Agregar emojis si no los tienen\n      if (!etiquetaSi.includes('✅')) etiquetaSi = '✅ ' + etiquetaSi;\n      if (!etiquetaNo.includes('❌')) etiquetaNo = '❌ ' + etiquetaNo;\n      \n      // =====================================================\n      // DETERMINAR DESTINOS\n      // =====================================================\n      let destinoSi = nextId;\n      let destinoNo = 'FIN';\n      \n      // Usar nuevos campos si existen\n      if (paso.destino_si) {\n        destinoSi = parsearDestino(paso.destino_si, i, pasos.length);\n      }\n      if (paso.destino_no) {\n        destinoNo = parsearDestino(paso.destino_no, i, pasos.length);\n      } else if (paso.si_no_cumple) {\n        // Fallback al campo antiguo\n        destinoNo = parsearDestino(paso.si_no_cumple, i, pasos.length);\n      }\n      \n      if (destinoNo === 'RECHAZADO') usaRechazado = true;\n      \n      // Generar conexiones\n      mermaid += `  ${currentId} -->|\"${etiquetaSi}\"| ${destinoSi}\\n`;\n      mermaid += `  ${currentId} -->|\"${etiquetaNo}\"| ${destinoNo}\\n`;\n      \n    } else {\n      mermaid += `  ${currentId} --> ${nextId}\\n`;\n    }\n  }\n  \n  // Conectar RECHAZADO si se usa\n  if (usaRechazado) {\n    mermaid += '  RECHAZADO --> P1\\n';\n  }\n  \n  return mermaid;\n}\n\n// =====================================================\n// FUNCIÓN: Parsear destino a ID de nodo\n// =====================================================\nfunction parsearDestino(destino, indexActual, totalPasos) {\n  if (!destino || typeof destino !== 'string') return 'FIN';\n  \n  const texto = destino.toLowerCase().trim();\n  \n  // Buscar número de paso\n  const matchPaso = texto.match(/paso\\s*(\\d+)/i) || texto.match(/^(\\d+)$/);\n  if (matchPaso) {\n    const num = parseInt(matchPaso[1]);\n    if (num >= 1 && num <= totalPasos) return `P${num}`;\n  }\n  \n  // Palabras clave\n  if (texto.includes('siguiente')) return indexActual < totalPasos - 1 ? `P${indexActual + 2}` : 'FIN';\n  if (texto.includes('fin') || texto.includes('termina') || texto.includes('cancela')) return 'FIN';\n  if (texto.includes('reevalu') || texto.includes('rechaz') || texto.includes('devuelv') || texto.includes('corregir')) return 'RECHAZADO';\n  if (texto.includes('inicio') || texto.includes('principio')) return 'P1';\n  \n  return 'FIN';\n}\n\n// =====================================================\n// FUNCIÓN FALLBACK: Extraer etiquetas del campo decisiones\n// =====================================================\nfunction extraerEtiquetasDesdeCampoDecisiones(texto) {\n  if (!texto) return { si: '✅ Sí', no: '❌ No' };\n  \n  const t = texto.toLowerCase();\n  \n  // Patrones conocidos\n  if (t.includes('positivo') && t.includes('negativo')) return { si: 'Positivo', no: 'Negativo' };\n  if (t.includes('aprobad') && t.includes('rechazad')) return { si: 'Aprobado', no: 'Rechazado' };\n  if (t.includes('viable') && t.includes('no viable')) return { si: 'Viable', no: 'No viable' };\n  if (t.includes('cumple') && t.includes('no cumple')) return { si: 'Cumple', no: 'No cumple' };\n  if (t.includes('acepta') && t.includes('rechaza')) return { si: 'Acepta', no: 'Rechaza' };\n  if (t.includes('disponible')) return { si: 'Disponible', no: 'No disponible' };\n  if (t.includes('stock')) return { si: 'Con stock', no: 'Sin stock' };\n  if (t.includes('valid')) return { si: 'Válido', no: 'Inválido' };\n  if (t.includes('correct')) return { si: 'Correcto', no: 'Incorrecto' };\n  if (t.includes('complet')) return { si: 'Completo', no: 'Incompleto' };\n  if (t.includes('conforme')) return { si: 'Conforme', no: 'No conforme' };\n  if (t.includes('autoriz')) return { si: 'Autorizado', no: 'No autorizado' };\n  if (t.includes('procede')) return { si: 'Procede', no: 'No procede' };\n  if (t.includes('exitoso') || t.includes('éxito')) return { si: 'Exitoso', no: 'Fallido' };\n  \n  // Intentar extraer de formato \"X/Y\" o \"X o Y\"\n  const match = texto.match(/([^\\/,]+)\\s*[\\/]\\s*([^\\/,]+)/);\n  if (match && match[1].length > 1 && match[2].length > 1) {\n    return { \n      si: match[1].trim().substring(0, 25), \n      no: match[2].trim().substring(0, 25) \n    };\n  }\n  \n  return { si: 'Sí', no: 'No' };\n}\n\n// =====================================================\n// GENERAR TABLA DE PASOS\n// =====================================================\n\nfunction generarTablaPasos(pasos) {\n  if (!pasos || pasos.length === 0) {\n    return '<tr><td colspan=\"7\">No hay pasos documentados</td></tr>';\n  }\n  \n  return pasos.map(paso => {\n    const esDecision = paso.es_decision === true || (paso.etiqueta_si && paso.etiqueta_no);\n    const estiloFila = esDecision ? 'style=\"background-color: #fffbeb;\"' : '';\n    const icono = esDecision ? '⚡ ' : '';\n    \n    // Mostrar info de decisión si existe\n    let infoDecision = paso.decisiones || '-';\n    if (esDecision && paso.etiqueta_si && paso.etiqueta_no) {\n      infoDecision = `${paso.etiqueta_si} / ${paso.etiqueta_no}`;\n      if (paso.destino_no) {\n        infoDecision += `<br><small><em>Si ${paso.etiqueta_no}: ${paso.destino_no}</em></small>`;\n      }\n    }\n    \n    return `\n    <tr ${estiloFila}>\n      <td><span class=\"step-number\">${paso.numero || '?'}</span></td>\n      <td><strong>${icono}${paso.nombre || 'Sin nombre'}</strong></td>\n      <td>${paso.responsable || '-'}</td>\n      <td>${paso.sistema || '-'}</td>\n      <td>${paso.entrada || '-'}</td>\n      <td>${paso.salida || '-'}</td>\n      <td>${infoDecision}</td>\n    </tr>\n  `;\n  }).join('');\n}\n\n// =====================================================\n// GENERAR HTML COMPLETO\n// =====================================================\n\nconst fechaGeneracion = new Date().toLocaleDateString('es-CL', {\n  year: 'numeric', month: 'long', day: 'numeric',\n  hour: '2-digit', minute: '2-digit'\n});\n\nconst diagramaMermaid = generarDiagramaMermaid(pasos);\nconst tablaPasos = generarTablaPasos(pasos);\n\nconst totalDecisiones = pasos.filter(p => \n  p.es_decision === true || \n  (p.etiqueta_si && p.etiqueta_no) ||\n  (p.decisiones && p.decisiones.trim().length > 2 && p.decisiones.toLowerCase() !== 'no' && p.decisiones !== '-')\n).length;\n\nconst htmlReporte = `<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Proceso: ${pd.nombreProceso || 'Documentado'}</title>\n  <script src=\"https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js\"></script>\n  <style>\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body {\n      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;\n      background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%);\n      min-height: 100vh;\n      padding: 2rem;\n    }\n    .container { max-width: 1200px; margin: 0 auto; }\n    \n    .header {\n      background: white;\n      border-radius: 16px;\n      padding: 2rem;\n      margin-bottom: 1.5rem;\n      box-shadow: 0 10px 40px rgba(0,0,0,0.2);\n      text-align: center;\n    }\n    .header h1 { color: #1a365d; font-size: 2rem; margin-bottom: 0.5rem; }\n    .header .meta { color: #718096; font-size: 0.9rem; }\n    .badge {\n      display: inline-block;\n      padding: 0.25rem 0.75rem;\n      background: #e2e8f0;\n      color: #2d3748;\n      border-radius: 20px;\n      font-size: 0.85rem;\n      margin: 0.5rem 0.25rem;\n    }\n    .badge.primary { background: #3182ce; color: white; }\n    .badge.success { background: #38a169; color: white; }\n    .badge.warning { background: #f59e0b; color: white; }\n    \n    .card {\n      background: white;\n      border-radius: 16px;\n      padding: 1.5rem;\n      margin-bottom: 1.5rem;\n      box-shadow: 0 4px 20px rgba(0,0,0,0.1);\n    }\n    .card h2 {\n      color: #1a365d;\n      font-size: 1.25rem;\n      margin-bottom: 1rem;\n      padding-bottom: 0.75rem;\n      border-bottom: 2px solid #e2e8f0;\n    }\n    \n    .diagram-container {\n      background: #f7fafc;\n      border-radius: 12px;\n      padding: 2rem;\n      overflow-x: auto;\n    }\n    .mermaid { display: flex; justify-content: center; }\n    \n    .legend {\n      display: flex;\n      flex-wrap: wrap;\n      gap: 1rem;\n      margin-top: 1rem;\n      padding: 1rem;\n      background: #f7fafc;\n      border-radius: 8px;\n    }\n    .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }\n    .legend-color { width: 20px; height: 20px; border-radius: 4px; }\n    .legend-inicio { background: #10b981; }\n    .legend-paso { background: #3b82f6; }\n    .legend-decision { background: #f59e0b; }\n    .legend-fin { background: #8b5cf6; }\n    .legend-rechazado { background: #ef4444; }\n    \n    .steps-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }\n    .steps-table th {\n      background: #2d3748;\n      color: white;\n      padding: 0.75rem;\n      text-align: left;\n      font-weight: 600;\n    }\n    .steps-table th:first-child { border-radius: 8px 0 0 0; }\n    .steps-table th:last-child { border-radius: 0 8px 0 0; }\n    .steps-table td { padding: 0.75rem; border-bottom: 1px solid #e2e8f0; vertical-align: top; }\n    .steps-table tr:hover { background: #f7fafc; }\n    .step-number {\n      display: inline-flex;\n      align-items: center;\n      justify-content: center;\n      width: 1.75rem;\n      height: 1.75rem;\n      background: #3182ce;\n      color: white;\n      border-radius: 50%;\n      font-weight: bold;\n      font-size: 0.8rem;\n    }\n    \n    .footer {\n      text-align: center;\n      color: rgba(255,255,255,0.7);\n      padding: 2rem;\n      font-size: 0.85rem;\n    }\n    \n    @media print {\n      body { background: white; padding: 0; }\n      .card { box-shadow: none; border: 1px solid #e2e8f0; }\n    }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>📋 ${pd.nombreProceso || 'Proceso Documentado'}</h1>\n      <p class=\"meta\">Documentación generada automáticamente</p>\n      <div>\n        <span class=\"badge primary\">📊 ${pasos.length} pasos</span>\n        <span class=\"badge warning\">⚡ ${totalDecisiones} decisiones</span>\n        <span class=\"badge success\">✅ Documentado</span>\n      </div>\n    </div>\n    \n    <div class=\"card\">\n      <h2>🔀 Diagrama de Flujo</h2>\n      <div class=\"diagram-container\">\n        <pre class=\"mermaid\">${diagramaMermaid}</pre>\n      </div>\n      <div class=\"legend\">\n        <div class=\"legend-item\"><div class=\"legend-color legend-inicio\"></div> Inicio</div>\n        <div class=\"legend-item\"><div class=\"legend-color legend-paso\"></div> Paso/Actividad</div>\n        <div class=\"legend-item\"><div class=\"legend-color legend-decision\"></div> Decisión</div>\n        <div class=\"legend-item\"><div class=\"legend-color legend-fin\"></div> Fin</div>\n        <div class=\"legend-item\"><div class=\"legend-color legend-rechazado\"></div> Reevaluación</div>\n      </div>\n    </div>\n    \n    <div class=\"card\">\n      <h2>📝 Detalle de Pasos</h2>\n      <p style=\"margin-bottom: 1rem; color: #718096; font-size: 0.9rem;\">\n        ⚡ Los pasos resaltados contienen puntos de decisión/bifurcación\n      </p>\n      <table class=\"steps-table\">\n        <thead>\n          <tr>\n            <th style=\"width: 40px\">#</th>\n            <th>Actividad</th>\n            <th>Responsable</th>\n            <th>Sistema</th>\n            <th>Entrada</th>\n            <th>Salida</th>\n            <th>Decisiones</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${tablaPasos}\n        </tbody>\n      </table>\n    </div>\n    \n    <div class=\"footer\">\n      <p>Sistema Entrevistador de Procesos v2 - Actor-Critic</p>\n      <p>${fechaGeneracion}</p>\n    </div>\n  </div>\n  \n  <script>\n    mermaid.initialize({\n      startOnLoad: true,\n      theme: 'base',\n      themeVariables: {\n        primaryColor: '#3182ce',\n        primaryTextColor: '#fff',\n        primaryBorderColor: '#2c5282',\n        lineColor: '#4a5568',\n        secondaryColor: '#f59e0b',\n        tertiaryColor: '#f7fafc'\n      },\n      flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }\n    });\n  </script>\n</body>\n</html>`;\n\n// =====================================================\n// EMAIL BODY\n// =====================================================\n\nconst emailBody = `\n<div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\">\n  <div style=\"background: linear-gradient(135deg, #1a365d, #2d3748); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 20px;\">\n    <h1 style=\"color: white; margin: 0; font-size: 24px;\">📋 ${pd.nombreProceso || 'Proceso Documentado'}</h1>\n    <p style=\"color: rgba(255,255,255,0.8); margin-top: 10px;\">Documentación generada automáticamente</p>\n  </div>\n  \n  <div style=\"background: white; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;\">\n    <h2 style=\"color: #1a365d; margin-top: 0;\">📊 Resumen</h2>\n    <p><strong>Nombre:</strong> ${pd.nombreProceso || 'Sin nombre'}</p>\n    <p><strong>Total de pasos:</strong> ${pasos.length}</p>\n    <p><strong>Puntos de decisión:</strong> ${totalDecisiones}</p>\n    <p><strong>Fecha:</strong> ${fechaGeneracion}</p>\n  </div>\n  \n  <div style=\"background: white; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;\">\n    <h2 style=\"color: #1a365d; margin-top: 0;\">📝 Pasos del Proceso</h2>\n    <ol style=\"padding-left: 20px;\">\n      ${pasos.map(p => {\n        const esDecision = p.es_decision === true || (p.etiqueta_si && p.etiqueta_no);\n        const icono = esDecision ? '⚡ ' : '';\n        const infoDecision = esDecision && p.etiqueta_si ? ` | Decisión: ${p.etiqueta_si}/${p.etiqueta_no}` : '';\n        return `<li style=\"margin-bottom: 10px;\"><strong>${icono}${p.nombre}</strong><br><span style=\"color: #718096;\">👤 ${p.responsable || 'N/A'} | 💻 ${p.sistema || 'N/A'}${infoDecision}</span></li>`;\n      }).join('')}\n    </ol>\n  </div>\n  \n  <div style=\"background: #f0f9ff; padding: 20px; border-radius: 12px; border: 1px solid #3182ce; text-align: center;\">\n    <p style=\"margin: 0; color: #1a365d;\"><strong>📎 Archivo adjunto:</strong> Abre el archivo HTML adjunto en tu navegador para ver el diagrama de flujo interactivo.</p>\n  </div>\n</div>\n`;\n\n// =====================================================\n// PREPARAR SALIDA\n// =====================================================\n\nconst nombreArchivo = `proceso_${(pd.nombreProceso || 'documento').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30)}_${Date.now()}.html`;\nconst base64Content = Buffer.from(htmlReporte, 'utf-8').toString('base64');\n\nreturn [{\n  json: {\n    ...data,\n    htmlReporte: htmlReporte,\n    emailBody: emailBody,\n    nombreArchivo: nombreArchivo\n  },\n  binary: {\n    attachment: {\n      data: base64Content,\n      mimeType: 'text/html',\n      fileName: nombreArchivo\n    }\n  }\n}];\n\n// Nueva linea añadida para comprobar el tipo de destino\nif (typeof destino !== 'string') return 'FIN';"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        -16
+      ],
+      "id": "4435173c-b041-4ded-ade7-595239c5216a",
+      "name": "Generar_Reporte"
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.emailUsuario }}",
+        "subject": "=📋 Reporte de Proceso: {{ $json.processData.nombreProceso }}",
+        "bodyContent": "={{ $json.emailBody }}",
+        "additionalFields": {
+          "attachments": {
+            "attachments": [
+              {
+                "binaryPropertyName": "attachment"
+              }
+            ]
+          },
+          "bodyContentType": "html"
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -16
+      ],
+      "id": "99b2a4bb-9d48-4a3d-a967-532231a4296f",
+      "name": "Enviar_Email",
+      "webhookId": "9fcaceab-2389-4269-a8b6-66bd9ac1eaea",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "SzH7j8Kb5i31hVdr",
+          "name": "Microsoft Outlook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "632a4dd8-49b5-45bd-a366-a75f7e4446a7",
+              "leftValue": "={{ $json.isNewSession }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -272,
+        272
+      ],
+      "id": "9e0bd524-fe27-4425-a40b-3c541b27f7eb",
+      "name": "IF_Nueva_Sesion"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "fWd7a7AVt8vyKxLG",
+          "mode": "list",
+          "cachedResultName": "datos",
+          "cachedResultUrl": "/projects/yv0Dl9XSybX6dE74/datatables/fWd7a7AVt8vyKxLG"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $json.sessionId }}",
+            "current_phase": "={{ $json.current_phase }}",
+            "process_data": "={{ $json.process_data }}",
+            "conversation": "={{ $json.conversation }}",
+            "email_usuario": "={{ $json.email_usuario }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "current_phase",
+              "displayName": "current_phase",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "process_data",
+              "displayName": "process_data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "conversation",
+              "displayName": "conversation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email_usuario",
+              "displayName": "email_usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        176
+      ],
+      "id": "24df7fb2-8f86-4edb-ad23-6faba244148f",
+      "name": "Insert_Row"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "fWd7a7AVt8vyKxLG",
+          "mode": "list",
+          "cachedResultName": "datos",
+          "cachedResultUrl": "/projects/yv0Dl9XSybX6dE74/datatables/fWd7a7AVt8vyKxLG"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "current_phase": "={{ $json.current_phase }}",
+            "process_data": "={{ $json.process_data }}",
+            "conversation": "={{ $json.conversation }}",
+            "email_usuario": "={{ $json.email_usuario }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "current_phase",
+              "displayName": "current_phase",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "process_data",
+              "displayName": "process_data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "conversation",
+              "displayName": "conversation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email_usuario",
+              "displayName": "email_usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        368
+      ],
+      "id": "69372f74-88cc-4eab-ae49-bb92b2c3dd50",
+      "name": "Update_Row"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// NODO: Respuesta_Final\n// =====================================================\n\n// Obtener el output del nodo Procesar_Critic\nconst criticData = $('Procesar_Critic').first().json;\n\nreturn [{\n  json: {\n    output: criticData.output\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        272
+      ],
+      "id": "c66059a0-dbbc-4243-99b6-658a6f3fca4f",
+      "name": "Respuesta_Final"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// NODO: Respuesta_Email\n// =====================================================\n\nconst data = $('Procesar_Critic').first().json;\n\nreturn [{\n  json: {\n    output: `✅ ¡Listo! He enviado el reporte del proceso \"${data.processData.nombreProceso}\" a tu correo: ${data.emailUsuario}\\n\\n📊 El reporte incluye el diagrama de flujo y el detalle de los ${data.processData.pasos.length} pasos documentados.`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        -16
+      ],
+      "id": "979ffc39-2086-473d-a160-b6cd08fd2924",
+      "name": "Respuesta_Email"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5.1",
+          "mode": "list",
+          "cachedResultName": "gpt-5.1"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1072,
+        384
+      ],
+      "id": "86b6c04c-fe8d-4a23-a59e-bfd59b88a88b",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "mExlDaZqOqsAsa15",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// NODO: extraer_datos\n// =====================================================\n\nconst chatInput = $input.first().json;\n\n// Extraer datos del chat\nconst sessionId = chatInput.sessionId || `session_${Date.now()}`;\nconst userMessage = chatInput.chatInput || chatInput.message || '';\n\n// Intentar extraer email del mensaje si lo menciona\nconst emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/;\nconst emailMatch = userMessage.match(emailRegex);\nconst emailExtraido = emailMatch ? emailMatch[0] : null;\n\nreturn [{\n  json: {\n    sessionId: sessionId,\n    userMessage: userMessage,\n    emailUsuario: emailExtraido\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2320,
+        176
+      ],
+      "id": "ef7c24bd-9776-4369-ac5c-f0c0bd51a8eb",
+      "name": "extraer_datos1"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "fWd7a7AVt8vyKxLG",
+          "mode": "list",
+          "cachedResultName": "datos",
+          "cachedResultUrl": "/projects/yv0Dl9XSybX6dE74/datatables/fWd7a7AVt8vyKxLG"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -2096,
+        176
+      ],
+      "id": "d65f0e86-949d-4698-a488-7bccc6d0e020",
+      "name": "sesiones_entrevistador1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// NODO: preparar_sesion (Actor-Critic v2)\n// =====================================================\n\nconst input = $input.first().json;\nconst datosExtraidos = $('extraer_datos1').first().json;\n\n// Datos del mensaje\nconst sessionId = datosExtraidos.sessionId;\nconst userMessage = datosExtraidos.userMessage || '';\nconst emailUsuario = datosExtraidos.emailUsuario || '';\n\n// Verificar si hay sesión existente\nconst isNewSession = !input.sessionId;\n\n// =====================================================\n// INICIALIZAR O RECUPERAR SESIÓN\n// =====================================================\n\nlet session;\n\nif (isNewSession) {\n  session = {\n    currentPhase: 1,\n    processData: {\n      nombreProceso: '',\n      pasos: [],\n      informacionExtraida: ''\n    },\n    conversation: [],\n    feedbackCritic: '',\n    emailUsuario: ''\n  };\n} else {\n  session = {\n    currentPhase: input.current_phase || 1,\n    processData: typeof input.process_data === 'string' ? JSON.parse(input.process_data || '{}') : (input.process_data || {}),\n    conversation: typeof input.conversation === 'string' ? JSON.parse(input.conversation || '[]') : (input.conversation || []),\n    feedbackCritic: '',\n    emailUsuario: input.email_usuario || ''\n  };\n}\n\n// Si el usuario envió email en este mensaje, guardarlo\nif (emailUsuario) {\n  session.emailUsuario = emailUsuario;\n}\n\n// =====================================================\n// AGREGAR MENSAJE A LA CONVERSACIÓN\n// =====================================================\n\nsession.conversation.push({\n  role: 'user',\n  content: userMessage,\n  timestamp: new Date().toISOString()\n});\n\n// Mantener solo últimos 20 mensajes\nif (session.conversation.length > 20) {\n  session.conversation = session.conversation.slice(-20);\n}\n\n// =====================================================\n// RETORNAR DATOS\n// =====================================================\n\nreturn [{\n  json: {\n    sessionId: sessionId,\n    userMessage: userMessage,\n    session: session,\n    processData: session.processData,\n    isNewSession: isNewSession,\n    feedbackCritic: session.feedbackCritic,\n    conversation: session.conversation,\n    emailUsuario: session.emailUsuario\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1872,
+        176
+      ],
+      "id": "d3570422-92e7-45bf-ae07-df805a815480",
+      "name": "preparar_sesion1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-5-20250929",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -1648,
+        368
+      ],
+      "id": "f095fca6-5f11-4bc2-8afb-a79cb359dc9d",
+      "name": "Anthropic Chat Model1",
+      "credentials": {
+        "anthropicApi": {
+          "id": "lcau0MVD04JwBBuU",
+          "name": "claude"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "80d860f3-17e8-410c-9c08-36169e54518f",
+              "name": "respuesta",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        432,
+        -16
+      ],
+      "id": "c8238751-ff35-414b-9b12-d39c298622d5",
+      "name": "var_reporte"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1f54d097-3724-420c-b7fa-d298697197d6",
+              "name": "respuesta",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        432,
+        256
+      ],
+      "id": "ccf82249-5c23-441e-be38-ad15b1e9fae4",
+      "name": "var_output"
+    }
+  ],
+  "pinData": {
+    "input": [
+      {
+        "json": {
+          "chatInput": "si",
+          "sessionId": "session_1768849161358"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "input": {
+      "main": [
+        [
+          {
+            "node": "extraer_datos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ACTOR": {
+      "main": [
+        [
+          {
+            "node": "Procesar_Actor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRITIC": {
+      "main": [
+        [
+          {
+            "node": "Procesar_Critic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar_Critic": {
+      "main": [
+        [
+          {
+            "node": "If_Reporte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar_Actor": {
+      "main": [
+        [
+          {
+            "node": "CRITIC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If_Reporte": {
+      "main": [
+        [
+          {
+            "node": "Generar_Reporte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF_Nueva_Sesion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar_Reporte": {
+      "main": [
+        [
+          {
+            "node": "Enviar_Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar_Email": {
+      "main": [
+        [
+          {
+            "node": "Respuesta_Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF_Nueva_Sesion": {
+      "main": [
+        [
+          {
+            "node": "Insert_Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update_Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert_Row": {
+      "main": [
+        [
+          {
+            "node": "Respuesta_Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update_Row": {
+      "main": [
+        [
+          {
+            "node": "Respuesta_Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta_Final": {
+      "main": [
+        [
+          {
+            "node": "var_output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta_Email": {
+      "main": [
+        [
+          {
+            "node": "var_reporte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "CRITIC",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extraer_datos1": {
+      "main": [
+        [
+          {
+            "node": "sesiones_entrevistador1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sesiones_entrevistador1": {
+      "main": [
+        [
+          {
+            "node": "preparar_sesion1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "preparar_sesion1": {
+      "main": [
+        [
+          {
+            "node": "ACTOR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "ACTOR",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f8675cb8-e35d-4fa9-8dc7-21572d2194ff",
+  "meta": {
+    "instanceId": "0048be561be8ce8465645b9402273a44a270634fe9daeef83a17ba3f6be05638"
+  },
+  "id": "huMPtvPqdpZgKL6O",
+  "tags": []
+}
